@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken");
-module.exports = (req, res, next) => {
+const isAuth = (req, res, next) => {
   try {
     const { token } = req.headers?.authorization;
     if (!token) {
@@ -13,3 +13,5 @@ module.exports = (req, res, next) => {
     throw new Error(err);
   }
 };
+
+module.exports = { isAuth };

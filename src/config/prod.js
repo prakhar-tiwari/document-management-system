@@ -1,3 +1,3 @@
 module.exports={
-    MONGO_CONNECT_URL = process.env.MONGO_CONNECT_URL
+    MONGO_CONNECT_URL : process.env.MONGO_CONNECT_URL
 }
