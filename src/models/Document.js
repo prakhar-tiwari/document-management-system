@@ -8,6 +8,10 @@ const documentSchema = new Schema({
     contentType: String,
   },
   folderPath: String,
+  user: {
+    type: mongoose.Types.ObjectId,
+    ref: "User",
+  },
 });
 
 module.exports = mongoose.model("Document", documentSchema);

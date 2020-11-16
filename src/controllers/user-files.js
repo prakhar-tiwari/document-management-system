@@ -38,16 +38,91 @@ const getAllFiles = async (req, res, next) => {
   return res.status(200).json(allDocuments);
 };
 
+const getFilesByFolder = async (req, res, next) => {
+  const { folderName } = req.body;
+  const parent = path.resolve(__dirname, ".."); // get parent folder path
+  const destination = path.join(parent, "documents");
+  const folderPath = path.join(destination, folderName);
+  const { userName } = req.user;
+
+  const result = await Document.aggregate([
+    {
+      $match: {
+        folderPath: folderPath,
+      },
+    },
+    {
+      $lookup: {
+        from: "users",
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $eq: ["$userName", userName],
+              },
+            },
+          },
+          {
+            $project: {
+              name: 1,
+              userName: 1,
+            },
+          },
+        ],
+        as: "user_docs",
+      },
+    },
+    {
+      $unwind: "$user_docs",
+    },
+    {
+      $project: {
+        fileName: 1,
+        folderPath: 1,
+        user_docs: 1,
+      },
+    },
+  ]);
+  return res.status(200).json(result);
+};
+
+const createFolder = async (req, res, next) => {
+  const { folderName } = req.body;
+  const folder = await createNewFolder(folderName);
+
+  const { userName } = req.user;
+  const user = await User.findOne({ userName });
+
+  const document = await Document.create({
+    folderPath: folder,
+    user: user._id,
+  });
+
+  user.documents.push(mongoose.Types.ObjectId(document._id));
+  await user.save();
+  return res.status(201).json({ msg: "Folder created successfully" });
+};
+
+const createNewFolder = async (folderName) => {
+  const root = path.dirname(__dirname);
+  const folder = path.join(root, folderName);
+  await createDirectory(folder);
+  return folder;
+};
+
 const createFile = async (req, res, next) => {
   const { folderName, fileName } = req.body;
   const { folderPath, filePath } = await createNewFile(folderName, fileName);
   const fileNameSaved = path.basename(filePath);
+
+  const { userName } = req.user;
+  const user = await User.findOne({ userName });
+
   const document = await Document.create({
     fileName: fileNameSaved,
     folderPath: folderPath,
+    user: user._id,
   });
-  const { userName } = req.user;
-  const user = await User.findOne({ userName });
 
   user.documents.push(mongoose.Types.ObjectId(document._id));
   await user.save();
@@ -80,4 +155,4 @@ const createNewFile = async (folderName, fileName) => {
   return { folderPath, filePath };
 };
 
-module.exports = { getAllFiles, createFile };
+module.exports = { getAllFiles, createFile, createFolder, getFilesByFolder };
