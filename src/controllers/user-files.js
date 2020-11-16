@@ -54,18 +54,20 @@ const getFilesByFolder = async (req, res, next) => {
     {
       $lookup: {
         from: "users",
+        let: { userId: "$user" },
         pipeline: [
+          {
+            $match: {
+              $expr: {
+                $eq: ["$_id", "$$userId"],
+              },
+            },
+          },
           {
             $match: {
               $expr: {
                 $eq: ["$userName", userName],
               },
-            },
-          },
-          {
-            $project: {
-              name: 1,
-              userName: 1,
             },
           },
         ],
@@ -78,8 +80,7 @@ const getFilesByFolder = async (req, res, next) => {
     {
       $project: {
         fileName: 1,
-        folderPath: 1,
-        user_docs: 1,
+        folderPath: 1
       },
     },
   ]);
