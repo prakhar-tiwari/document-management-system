@@ -5,6 +5,6 @@ const filesRouter = express.Router();
 
 filesRouter.get("/api/getfiles", isAuth, getAllFiles);
 
-filesRouter.post("/api/createfile", createFile);
+filesRouter.post("/api/createfile", isAuth, createFile);
 
 module.exports = { filesRouter };

@@ -3,8 +3,11 @@ const Schema = mongoose.Schema;
 
 const documentSchema = new Schema({
   fileName: String,
-  fileContent: Blob,
+  fileContent: {
+    data: Buffer,
+    contentType: String,
+  },
   folderPath: String,
 });
 
-module.exports = mongoose.model("User", documentSchema);
+module.exports = mongoose.model("Document", documentSchema);

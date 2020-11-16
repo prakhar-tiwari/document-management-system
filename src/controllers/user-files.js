@@ -2,22 +2,57 @@ const fs = require("fs");
 const path = require("path");
 const util = require("util");
 const NotFoundError = require("../errors/not-found-error");
+const User = require("../models/User");
+const Document = require("../models/Document");
+const mongoose = require("mongoose");
 
 const createDirectory = util.promisify(fs.mkdir);
 const writeFile = util.promisify(fs.writeFile);
 
 const getAllFiles = async (req, res, next) => {
-  const { user } = req;
-  if (user) {
-    throw new NotFoundError();
+  const { userName } = req.user;
+  const user = await User.findOne({ userName });
+  const { documents } = user;
+
+  const docs = await Document.find({ _id: { $in: documents } });
+  const folderNames = [];
+  const fileNames = [];
+  for (let item of docs) {
+    const folder = path.relative(path.dirname(__dirname), item.folderPath);
+    if (folder !== "documents") {
+      const folderName = path.relative(
+        path.dirname(item.folderPath),
+        item.folderPath
+      );
+      folderNames.push(folderName);
+    } else {
+      fileNames.push(item.fileName);
+    }
   }
-  return res.status(200).json("file uploaded");
+
+  const allDocuments = {
+    folderNames,
+    fileNames,
+  };
+
+  return res.status(200).json(allDocuments);
 };
 
 const createFile = async (req, res, next) => {
   const { folderName, fileName } = req.body;
-  const res = await createNewFile(folderName, fileName);
-  return res.status(200).json({ msg: "File created successfully" });
+  const { folderPath, filePath } = await createNewFile(folderName, fileName);
+  const fileNameSaved = path.basename(filePath);
+  const document = await Document.create({
+    fileName: fileNameSaved,
+    folderPath: folderPath,
+  });
+  const { userName } = req.user;
+  const user = await User.findOne({ userName });
+
+  user.documents.push(mongoose.Types.ObjectId(document._id));
+  await user.save();
+
+  return res.status(201).json({ msg: "File created succesfully" });
 };
 
 const checkDirectoryExistence = (filePath) => {
@@ -29,23 +64,20 @@ const checkDirectoryExistence = (filePath) => {
 };
 
 const createNewFile = async (folderName, fileName) => {
-  const parent = path.resolve(__dirname, "..");
+  const parent = path.resolve(__dirname, ".."); // get parent folder path
   const destination = path.join(parent, "documents");
   let folderPath = "";
   if (folderName) {
     folderPath = path.join(destination, folderName);
     if (checkDirectoryExistence(folderPath)) {
-      const _dir = await createDirectory(folderPath, { recursive: true });
+      await createDirectory(folderPath, { recursive: true });
     }
   } else {
     folderPath = destination;
   }
-
-  const _createdFile = await writeFile(
-    path.join(folderPath, fileName + ".txt"),
-    ""
-  );
-  return folderPath;
+  const filePath = path.join(folderPath, fileName + ".txt");
+  await writeFile(filePath, "");
+  return { folderPath, filePath };
 };
 
 module.exports = { getAllFiles, createFile };
