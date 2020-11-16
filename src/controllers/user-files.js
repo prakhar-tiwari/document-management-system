@@ -8,6 +8,7 @@ const mongoose = require("mongoose");
 
 const createDirectory = util.promisify(fs.mkdir);
 const writeFile = util.promisify(fs.writeFile);
+const renameFile = util.promisify(fs.rename);
 
 const getAllFiles = async (req, res, next) => {
   const { userName } = req.user;
@@ -56,20 +57,8 @@ const getFilesByFolder = async (req, res, next) => {
         from: "users",
         let: { userId: "$user" },
         pipeline: [
-          {
-            $match: {
-              $expr: {
-                $eq: ["$_id", "$$userId"],
-              },
-            },
-          },
-          {
-            $match: {
-              $expr: {
-                $eq: ["$userName", userName],
-              },
-            },
-          },
+          getMatchObj("$_id", "$$userId"),
+          getMatchObj("$userName", userName),
         ],
         as: "user_docs",
       },
@@ -80,7 +69,7 @@ const getFilesByFolder = async (req, res, next) => {
     {
       $project: {
         fileName: 1,
-        folderPath: 1
+        folderPath: 1,
       },
     },
   ]);
@@ -156,4 +145,41 @@ const createNewFile = async (folderName, fileName) => {
   return { folderPath, filePath };
 };
 
-module.exports = { getAllFiles, createFile, createFolder, getFilesByFolder };
+const moveFile = async (req, res, next) => {
+  const { oldFolderPath, newFolderPath, fileName, _id } = req.body;
+  if (
+    checkDirectoryExistence(oldFolderPath) &&
+    checkDirectoryExistence(newFolderPath)
+  ) {
+    const oldFilePath = path.join(oldFolderPath, fileName);
+    const newFilePath = path.join(newFolderPath, fileName);
+    try {
+      await renameFile(oldFilePath, newFilePath);
+      const document = await Document.findOne({ _id });
+      document.folderPath = newFolderPath;
+      await document.save();
+    } catch (err) {
+      console.log(err);
+    }
+  }
+
+  return res.status(201).json({ msg: "File move succesfully" });
+};
+
+function getMatchObj(first, second) {
+  return {
+    $match: {
+      $expr: {
+        $eq: [first, second],
+      },
+    },
+  };
+}
+
+module.exports = {
+  getAllFiles,
+  createFile,
+  createFolder,
+  getFilesByFolder,
+  moveFile,
+};
