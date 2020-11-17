@@ -7,7 +7,7 @@ const signup = async (req, res, next) => {
   const { name, userName, password } = req.body;
   const user = await User.findOne({ userName });
   if (user) {
-    throw new BadRequestError("User already exist");
+    res.respond.badRequest("User already exist");
   }
   const hashedPassword = await bcrypt.hash(password, 12);
   await User.create({
@@ -23,12 +23,12 @@ const login = async (req, res, next) => {
   const { userName, password } = req.body;
   const user = await User.findOne({ userName });
   if (!user) {
-    throw new BadRequestError("Incorrect username password combination");
+    res.respond.badRequest("Incorrect username password combination");
   }
 
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) {
-    throw new BadRequestError("Incorrect username password combination");
+    res.respond.badRequest("Incorrect username password combination");
   }
 
   const payload = {
@@ -38,7 +38,7 @@ const login = async (req, res, next) => {
 
   jwt.sign(payload, "secret", { expiresIn: 7200 }, (err, token) => {
     if (err) {
-      throw new BadRequestError(err.message);
+      res.respond.badRequest(err.message);
     }
     return res.status(200).json({ token });
   });
