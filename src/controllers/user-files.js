@@ -20,12 +20,12 @@ const getAllFiles = async (req, res, next) => {
   const fileNames = [];
   for (let item of docs) {
     const folder = path.relative(path.dirname(__dirname), item.folderPath);
-    if (folder !== "documents") {
+    if (folder !== `documents\\${userName}`) {
       const folderName = path.relative(
         path.dirname(item.folderPath),
         item.folderPath
       );
-      folderNames.push(folderName);
+      if (!folderNames.includes(folderName)) folderNames.push(folderName);
     } else {
       fileNames.push(item.fileName);
     }
@@ -41,10 +41,10 @@ const getAllFiles = async (req, res, next) => {
 
 const getFilesByFolder = async (req, res, next) => {
   const { folderName } = req.body;
+  const { userName } = req.user;
   const parent = path.resolve(__dirname, ".."); // get parent folder path
   const destination = path.join(parent, "documents");
-  const folderPath = path.join(destination, folderName);
-  const { userName } = req.user;
+  const folderPath = path.join(destination, userName, folderName);
 
   const result = await Document.aggregate([
     {
@@ -102,11 +102,15 @@ const createNewFolder = async (folderName) => {
 
 const createFile = async (req, res, next) => {
   const { folderName, fileName } = req.body;
-  const { folderPath, filePath } = await createNewFile(folderName, fileName);
-  const fileNameSaved = path.basename(filePath);
 
   const { userName } = req.user;
   const user = await User.findOne({ userName });
+  const { folderPath, filePath } = await createNewFile(
+    folderName,
+    fileName,
+    userName
+  );
+  const fileNameSaved = path.basename(filePath);
 
   const document = await Document.create({
     fileName: fileNameSaved,
@@ -128,15 +132,14 @@ const checkDirectoryExistence = (filePath) => {
   return false;
 };
 
-const createNewFile = async (folderName, fileName) => {
+const createNewFile = async (folderName, fileName, userName) => {
   const parent = path.resolve(__dirname, ".."); // get parent folder path
-  const destination = path.join(parent, "documents");
+  const destination = path.join(parent, "documents", userName);
+  await createDirectory(destination, { recursive: true });
   let folderPath = "";
   if (folderName) {
     folderPath = path.join(destination, folderName);
-    if (checkDirectoryExistence(folderPath)) {
-      await createDirectory(folderPath, { recursive: true });
-    }
+    await createDirectory(folderPath, { recursive: true });
   } else {
     folderPath = destination;
   }
@@ -146,6 +149,7 @@ const createNewFile = async (folderName, fileName) => {
 };
 
 const moveFile = async (req, res, next) => {
+  const {userName} = req.user;
   const { oldFolderPath, newFolderPath, fileName, _id } = req.body;
   if (
     checkDirectoryExistence(oldFolderPath) &&
@@ -153,9 +157,12 @@ const moveFile = async (req, res, next) => {
   ) {
     const oldFilePath = path.join(oldFolderPath, fileName);
     const newFilePath = path.join(newFolderPath, fileName);
-    try {
+    try {      
+      const document = await Document.findById(_id).populate('user');
+      if(document.user.userName !== userName){
+        res.respond.notAuthorized("User is not authorized for this operation");
+      }
       await renameFile(oldFilePath, newFilePath);
-      const document = await Document.findOne({ _id });
       document.folderPath = newFolderPath;
       await document.save();
     } catch (err) {
