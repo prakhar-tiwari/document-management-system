@@ -11,8 +11,8 @@
 3. If your are using Docker App your application will run on **localhost:5000**, If you use Docker Toolbox you can access your application on **192.168.99.100:5000**
 
 ## User accounts to test
-username - user
-password - user
+username - user <br />
+password - user <br />
 
 ## Further instructions
 1. /api/signup - you can provide unique userName to create a new user
